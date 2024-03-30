@@ -1,0 +1,7 @@
+git+https://github.com/Kaggle/learntools.git
+pandas
+scikit-learn
+numpy
+matplotlib
+seaborn
+statsmodels

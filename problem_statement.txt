@@ -1,0 +1,13 @@
+problem statement:
+-there are different shops and different product categories
+-for each shop and for each catergory we want to predict their sales in the closest 16 days
+
+
+sub-problem:
+-predict the values for one shop and for one category
+
+observations:
+-it is easier to implement/solve/comprehend sub-problem than the main problem
+-it we split the problem into sub-probelms it will require more computional power and will be slower
+
+
