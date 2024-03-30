@@ -1,8 +1,11 @@
 import os
 from typing import Tuple
 import pandas as pd
+import pickle
+from functools import lru_cache
 
 
+@lru_cache(maxsize=None)
 def load_files() -> Tuple[
     pd.DataFrame,
     pd.DataFrame,
@@ -23,6 +26,16 @@ def load_files() -> Tuple[
     5. sales
     6. query
     """
+    # --- LOAD FROM CACHE ---
+    cache_file = "cached_data.pkl"
+    # If cached file exists, load from it
+    if os.path.exists(cache_file):
+        with open(cache_file, "rb") as f:
+            print("Loading cached data...")
+            cached_data = pickle.load(f)
+        return cached_data
+
+    # --- LOAD DATA ---
     path = os.path.join(os.path.dirname(__file__), "../data/")
     holidays_events = pd.read_csv(
         path + "holidays_events.csv",
@@ -48,11 +61,12 @@ def load_files() -> Tuple[
 
     sales = pd.read_csv(
         path + "train.csv",
-        usecols=["store_nbr", "family", "date", "sales"],
+        usecols=["store_nbr", "family", "date", "sales", "onpromotion"],
         dtype={
             "store_nbr": "category",
             "family": "category",
             "sales": "float32",
+            "onpromotion": "uint32",
         },
         parse_dates=["date"],
         infer_datetime_format=True,
@@ -70,6 +84,11 @@ def load_files() -> Tuple[
         infer_datetime_format=True,
     )
     query["date"] = query["date"].dt.to_period("D")
+
+    # --- SAVE TO CACHE ---
+    with open(cache_file, "wb") as f:
+        print("Caching data...")
+        pickle.dump((holidays_events, oil, stores, transactions, sales, query), f)
 
     return holidays_events, oil, stores, transactions, sales, query
 
