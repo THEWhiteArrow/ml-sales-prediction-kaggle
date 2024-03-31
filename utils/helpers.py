@@ -27,7 +27,9 @@ def load_files() -> Tuple[
     6. query
     """
     # --- LOAD FROM CACHE ---
-    cache_file = "cached_data.pkl"
+    cache_file = os.path.join(
+        os.path.abspath(os.path.dirname(__file__)), "../cache/cached_data.pkl"
+    )
     # If cached file exists, load from it
     if os.path.exists(cache_file):
         with open(cache_file, "rb") as f:

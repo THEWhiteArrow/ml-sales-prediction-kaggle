@@ -9,6 +9,10 @@ Download the dataset from the [Kaggle competition page](https://www.kaggle.com/c
 
 Navigate to the project's main directory and run the main file using the command `python main.py`.
 
+### Caching
+
+The project uses a cahcing mechanism to load the data files into dataframes and store them in the `cache` directory. This is done to speed up the data loading process. If you want to reload the data from the original files, you can delete the files in the `cache` directory.
+
 ## Model
 
 The output of the project is a model that predicts the sales of a product in a store for a given date. The model is built using a time series forecasting approach.

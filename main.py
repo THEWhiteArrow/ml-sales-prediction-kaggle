@@ -1,5 +1,6 @@
 from typing import Dict
 from utils.helpers import load_files, save_submission
+from utils.hybrid_ml import solve_using_hybrid_ml
 from utils.optional_submission import (
     solve_optional_customized_submission,
     solve_optional_submission,
@@ -16,6 +17,7 @@ def main(options: Dict[str, bool]):
         "optional_submission": True,
         "optional_customized_submission": True,
         "time_features": True,
+        "hybrid_ml": True,
         **options,
     }
 
@@ -50,6 +52,18 @@ def main(options: Dict[str, bool]):
     if options["time_features"]:
         check_time_features(sales=sales)
 
+    # --- HYBRID MODEL ---
+    if options["hybrid_ml"]:
+        output = solve_using_hybrid_ml(
+            holidays_events=holidays_events,
+            oil=oil,
+            stores=stores,
+            transactions=transactions,
+            sales=sales,
+            query=query,
+        )
+        # save_submission(output, "hybrid_submission.py")
+
 
 if __name__ == "__main__":
     print("Starting...")
@@ -59,6 +73,7 @@ if __name__ == "__main__":
             "seasonality": False,
             "optional_submission": False,
             "optional_customized_submission": False,
-            "time_features": True,
+            "time_features": False,
+            "hybrid-ml": True,
         }
     )
