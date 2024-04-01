@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.deterministic import CalendarFourier, DeterministicProcess
@@ -49,7 +50,11 @@ def solve_optional_submission(
 
 
 def solve_optional_customized_submission(
-    holidays_events: pd.DataFrame, sales: pd.DataFrame, query: pd.DataFrame
+    holidays_events: pd.DataFrame,
+    sales: pd.DataFrame,
+    query: pd.DataFrame,
+    family_param: str | None,
+    store_nbr_param: str | None,
 ) -> pd.DataFrame:
     sales = sales.copy()
     holidays_events.copy()
@@ -64,6 +69,10 @@ def solve_optional_customized_submission(
 
     for store_n in all_stores:
         for family in all_families:
+            if (family_param is not None and family != family_param) or (
+                store_nbr_param is not None and store_n != store_nbr_param
+            ):
+                continue
             cnt += 1
             if cnt % 100 == 0:
                 print(f"Processing {cnt} of {len(all_families)*len(all_stores)}")
@@ -85,7 +94,7 @@ def solve_optional_customized_submission(
             )
             X = dp.in_sample()
             X["NewYear"] = X.index.dayofyear == 1  # type: ignore
-            model = LinearRegression(fit_intercept=False).fit(X, y["sales"])
+            model = LinearRegression(fit_intercept=False).fit(X, y)
 
             X_query = dp.out_of_sample(steps=16)
             X_query.index.name = "date"
@@ -96,6 +105,9 @@ def solve_optional_customized_submission(
             y_submit["store_nbr"] = store_n
             y_submit["family"] = family
             y_submit = y_submit.set_index(["family", "store_nbr"], append=True)
+            if family_param is not None or store_nbr_param is not None:
+                y_submit.plot(title=f"{family} - {store_n}")
+                plt.show()
             y_submit = y_submit.join(query.id).reindex(columns=["id", "sales"])
             output = pd.concat([output, y_submit])
 
