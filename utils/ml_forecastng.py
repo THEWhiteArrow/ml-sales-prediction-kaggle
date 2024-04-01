@@ -195,4 +195,7 @@ def solve_using_ml_forecasting(
             _ = ax2.legend(["Actual Sales (test)", "Predicted Sales (test)"])
             plt.show()
 
+            # --- PREDICT ---
+            # TODO: Implement query predictions
+
     return output
