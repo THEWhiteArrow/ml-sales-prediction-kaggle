@@ -91,11 +91,11 @@ def solve_using_ml_forecasting(
     query = query.copy()
     holidays_events = holidays_events.copy()
     oil = oil.copy()
-    limit = 1
+    limit = int(1e9)
     all_families = store_sales["family"].unique()[:limit]
     all_store_nbrs = store_sales["store_nbr"].unique()[:limit]
     output = pd.DataFrame({"id": [], "sales": []})
-
+    query_ref = query.copy().set_index(["date", "store_nbr", "family"]).unstack(["store_nbr", "family"])  # type: ignore
     # --- ML FORECASTING ---
     store_sales = (
         store_sales.set_index(["date", "store_nbr", "family"])
@@ -120,25 +120,32 @@ def solve_using_ml_forecasting(
     X_oil = pd.concat(
         [
             oil["dcoilwtico"],
-            make_lags(oil["dcoilwtico"], lags=2, name="oil"),
+            make_leads(oil["dcoilwtico"], leads=17, name="oil"),
         ],
         axis=1,
     )
+    cnt = 0
 
     for family in all_families:
         for store_nbr in all_store_nbrs:
-            print(f"Family: {family}, Store: {store_nbr}")
+            cnt += 1
+            if cnt % 50 == 0:
+                print(
+                    f"Processing {cnt} out of {len(all_families) * len(all_store_nbrs)}"
+                )
+
             y = store_sales["sales"][store_nbr][family][START:END].rename("sales").to_frame()  # type: ignore
             onpromotion = store_sales["onpromotion"][store_nbr][family][START:END].rename("onpromotion").to_frame()  # type: ignore
             X_lag = make_lags(y["sales"], lags=4).bfill()  # type: ignore
+            q_promo = query_ref["onpromotion"][store_nbr][family].rename("onpromotion").to_frame()  # type: ignore
+
+            combined_promo = pd.concat([onpromotion, q_promo], axis=0)
+
             X_promo = pd.concat(
                 [
-                    make_lags(
-                        onpromotion["onpromotion"], lags=1, name="onpromotion"
-                    ).bfill(),
-                    onpromotion,
+                    combined_promo,
                     make_leads(
-                        onpromotion["onpromotion"], leads=1, name="onpromotion"
+                        combined_promo["onpromotion"], leads=17, name="onpromotion"
                     ).ffill(),
                 ],
                 axis=1,
@@ -154,62 +161,73 @@ def solve_using_ml_forecasting(
                 drop_first=True,
             )
 
-            y = make_multistep_target(y, steps=16).ffill()  # type: ignore
-            print(X1)
-            print(X2)
+            y = make_multistep_target(y["sales"], steps=17).ffill()  # type: ignore
+
             y, X1 = y.align(X1, join="inner", axis=0)
+            # X2 includes also future HISTORICAL events so no look-ahead bias
             y, X2 = y.align(X2, join="inner", axis=0)
 
-            X1_train, X1_test, y_train, y_test = train_test_split(
-                X1, y, test_size=20, shuffle=False
-            )
-            X2_train, X2_test, y_train, y_test = train_test_split(
-                X2, y, test_size=20, shuffle=False
-            )
+            # X1_train, X1_test, y_train, y_test = train_test_split(
+            #     X1, y, test_size=20, shuffle=False
+            # )
+            # X2_train, X2_test, y_train, y_test = train_test_split(
+            #     X2, y, test_size=20, shuffle=False
+            # )
 
-            model = BoostedHybrid(LinearRegression(), XGBRegressor())
-            model.fit(X1_train, X2_train, y_train)
+            # model = BoostedHybrid(LinearRegression(), XGBRegressor())
+            # model.fit(X1_train, X2_train, y_train)
 
-            y_fit = pd.DataFrame(
-                model.predict(X1_train, X2_train), index=X1_train.index, columns=y.columns  # type: ignore
-            )
-            y_pred = pd.DataFrame(
-                model.predict(X1_test, X2_test), index=X1_test.index, columns=y.columns  # type: ignore
-            )
+            # y_fit = pd.DataFrame(
+            #     model.predict(X1_train, X2_train), index=X1_train.index, columns=y.columns  # type: ignore
+            # )
+            # y_pred = pd.DataFrame(
+            #     model.predict(X1_test, X2_test), index=X1_test.index, columns=y.columns  # type: ignore
+            # )
 
-            train_rmse = mean_squared_error(y_train, y_fit, squared=False)
-            test_rmse = mean_squared_error(y_test, y_pred, squared=False)
-            print((f"Train RMSE: {train_rmse:.2f}\n" f"Test RMSE: {test_rmse:.2f}"))
+            # train_rmse = mean_squared_error(y_train, y_fit, squared=False)
+            # test_rmse = mean_squared_error(y_test, y_pred, squared=False)
+            # print((f"Train RMSE: {train_rmse:.2f}\n" f"Test RMSE: {test_rmse:.2f}"))
 
-            palette = dict(palette="husl", n_colors=64)
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 6))
-            fig.suptitle(f"Family: {family}, Store: {store_nbr}")
-            ax1 = store_sales["sales"][store_nbr][family][y_fit.index].plot(
-                ax=ax1, **plot_params  # type: ignore
-            )
-            ax1 = plot_multistep(y_fit, ax=ax1, palette_kwargs=palette)
-            _ = ax1.legend(["Actual Sales (train)", "Predicted Sales (train)"])
-            ax2 = store_sales["sales"][store_nbr][family][y_pred.index].plot(
-                ax=ax2, **plot_params  # type: ignore
-            )
-            ax2 = plot_multistep(y_pred, ax=ax2, palette_kwargs=palette)
-            _ = ax2.legend(["Actual Sales (test)", "Predicted Sales (test)"])
-            plt.show()
+            # palette = dict(palette="husl", n_colors=64)
+            # fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 6))
+            # fig.suptitle(f"Family: {family}, Store: {store_nbr}")
+            # ax1 = store_sales["sales"][store_nbr][family][y_fit.index].plot(
+            #     ax=ax1, **plot_params  # type: ignore
+            # )
+            # ax1 = plot_multistep(y_fit, ax=ax1, palette_kwargs=palette)
+            # _ = ax1.legend(["Actual Sales (train)", "Predicted Sales (train)"])
+            # ax2 = store_sales["sales"][store_nbr][family][y_pred.index].plot(
+            #     ax=ax2, **plot_params  # type: ignore
+            # )
+            # ax2 = plot_multistep(y_pred, ax=ax2, palette_kwargs=palette)
+            # _ = ax2.legend(["Actual Sales (test)", "Predicted Sales (test)"])
+            # plt.show()
 
             # --- PREDICT ---
             # TODO: Implement query predictions
             model2 = BoostedHybrid(LinearRegression(), XGBRegressor())
             model2.fit(X1, X2, y)
             y_submission = pd.DataFrame(
-                model.predict(X1, X2), index=X1.index, columns=y.columns  # type: ignore
+                model2.predict(X1, X2), index=X1.index, columns=y.columns  # type: ignore
             )
-            print("here")
+            dates = pd.date_range(start="2017-08-16", periods=16, freq="D").to_period(
+                "D"
+            )
+            prediction_df = pd.DataFrame(
+                {
+                    "family": family,
+                    "store_nbr": store_nbr,
+                    "date": dates,
+                    "sales": y_submission.tail(1).squeeze().values[1:],
+                }
+            ).set_index(["family", "store_nbr", "date"])
+            combined_prediction = (
+                prediction_df.join(query.set_index(["family", "store_nbr", "date"]))
+                .reset_index()
+                .reindex(columns=["id", "sales"])
+            )
 
+            output = pd.concat([output, combined_prediction])
+    output = output.sort_values("id")
+    output["id"] = output["id"].astype(int).apply(lambda x: max(0, x))
     return output
-
-
-# def prepare_query(
-#     query: pd.DataFrame, store_sales: pd.DataFrame, family, store_nbr, START, END
-# ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-#     prev_sales = store_sales["sales"][store_nbr][family][START:END].rename("sales").to_frame()  # type: ignore
-#     prev_onpromotion = store_sales["onpromotion"][store_nbr][family][START:END].rename("onpromotion").to_frame()  # type: ignore

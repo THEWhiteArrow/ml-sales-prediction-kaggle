@@ -9,6 +9,7 @@ from utils.optional_submission import (
 from utils.seasonality import check_seasonality
 from utils.time_features import check_time_features
 from utils.trend import check_trend
+import pandas as pd
 
 
 def main(options: Dict[str, bool | str | None]):
@@ -80,10 +81,12 @@ def main(options: Dict[str, bool | str | None]):
             store_sales=sales,
             query=query,
         )
+        save_submission(output, "ml_forecasting_submission.csv")
 
 
 if __name__ == "__main__":
     print("Starting...")
+
     main(
         options={
             "trend": False,
