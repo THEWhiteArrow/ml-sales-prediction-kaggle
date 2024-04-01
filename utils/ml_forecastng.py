@@ -10,7 +10,7 @@ from learntools.time_series.utils import (
     plot_multistep,
 )
 
-# from sklearn.multioutput import MultiOutputRegressor
+from sklearn.multioutput import MultiOutputRegressor
 from xgboost import XGBRegressor
 from warnings import simplefilter
 
@@ -107,6 +107,24 @@ def solve_using_ml_forecasting(
     START = "2017"
     END = "2017-12-31"
 
+    X_holidays = (
+        holidays_events[
+            holidays_events["transferred"].eq(False)
+            & holidays_events["locale"].isin(["National", "Regional"])
+        ]["type"]
+        .cat.remove_unused_categories()
+        .cat.add_categories("No Holiday")
+        .to_frame()
+        .drop_duplicates()
+    )
+    X_oil = pd.concat(
+        [
+            oil["dcoilwtico"],
+            make_lags(oil["dcoilwtico"], lags=2, name="oil"),
+        ],
+        axis=1,
+    )
+
     for family in all_families:
         for store_nbr in all_store_nbrs:
             print(f"Family: {family}, Store: {store_nbr}")
@@ -125,23 +143,7 @@ def solve_using_ml_forecasting(
                 ],
                 axis=1,
             )
-            X_holidays = (
-                holidays_events[
-                    holidays_events["transferred"].eq(False)
-                    & holidays_events["locale"].isin(["National", "Regional"])
-                ]["type"]
-                .cat.remove_unused_categories()
-                .cat.add_categories("No Holiday")
-                .to_frame()
-                .drop_duplicates()
-            )
-            X_oil = pd.concat(
-                [
-                    oil["dcoilwtico"],
-                    make_lags(oil["dcoilwtico"], lags=2, name="oil"),
-                ],
-                axis=1,
-            )
+
             X1 = X_lag
             X2 = pd.get_dummies(
                 X_promo.join(X_oil)
@@ -159,14 +161,13 @@ def solve_using_ml_forecasting(
             y, X2 = y.align(X2, join="inner", axis=0)
 
             X1_train, X1_test, y_train, y_test = train_test_split(
-                X1, y, test_size=0.2, shuffle=False
+                X1, y, test_size=20, shuffle=False
             )
             X2_train, X2_test, y_train, y_test = train_test_split(
-                X2, y, test_size=0.2, shuffle=False
+                X2, y, test_size=20, shuffle=False
             )
 
             model = BoostedHybrid(LinearRegression(), XGBRegressor())
-            # model = MultiOutputRegressor(XGBRegressor())
             model.fit(X1_train, X2_train, y_train)
 
             y_fit = pd.DataFrame(
@@ -197,5 +198,18 @@ def solve_using_ml_forecasting(
 
             # --- PREDICT ---
             # TODO: Implement query predictions
+            model2 = BoostedHybrid(LinearRegression(), XGBRegressor())
+            model2.fit(X1, X2, y)
+            y_submission = pd.DataFrame(
+                model.predict(X1, X2), index=X1.index, columns=y.columns  # type: ignore
+            )
+            print("here")
 
     return output
+
+
+# def prepare_query(
+#     query: pd.DataFrame, store_sales: pd.DataFrame, family, store_nbr, START, END
+# ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+#     prev_sales = store_sales["sales"][store_nbr][family][START:END].rename("sales").to_frame()  # type: ignore
+#     prev_onpromotion = store_sales["onpromotion"][store_nbr][family][START:END].rename("onpromotion").to_frame()  # type: ignore
