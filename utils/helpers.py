@@ -3,6 +3,7 @@ from typing import Tuple
 import pandas as pd
 import pickle
 from functools import lru_cache
+from utils.logger import logger
 
 
 @lru_cache(maxsize=None)
@@ -33,7 +34,7 @@ def load_files() -> Tuple[
     # If cached file exists, load from it
     if os.path.exists(cache_file):
         with open(cache_file, "rb") as f:
-            print("Loading cached data...")
+            logger.info("Reading cache...")
             cached_data = pickle.load(f)
         return cached_data
 
@@ -81,6 +82,7 @@ def load_files() -> Tuple[
             "store_nbr": "category",
             "family": "category",
             "onpromotion": "uint32",
+            "id": "uint32",
         },
         parse_dates=["date"],
         infer_datetime_format=True,
@@ -89,7 +91,7 @@ def load_files() -> Tuple[
 
     # --- SAVE TO CACHE ---
     with open(cache_file, "wb") as f:
-        print("Caching data...")
+        logger.info("Saving cache...")
         pickle.dump((holidays_events, oil, stores, transactions, sales, query), f)
 
     return holidays_events, oil, stores, transactions, sales, query
