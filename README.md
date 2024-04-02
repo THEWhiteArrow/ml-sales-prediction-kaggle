@@ -14,22 +14,22 @@ It generates predictions for the test data and saves them in a CSV file in the `
 
 The project implements a few models that were build to experiment with different approaches to the problem. The models are:
 
--   Deterministic Process Model (Multiple Problem Apporach):
+-   Deterministic Process Model [DPF] (Multiple Problem Apporach):
 
     -   This model uses a deterministic process to predict the sales of all stores and products families at once. It uses a simple linear regression model to predict the sales of each product family at each store.
     -   Please find it in `optional_submission.py` file in `utils` directory in `solve_optional_submission` function.
 
--   Deterministic Process Model (Single Problem Approach):
+-   Deterministic Process Model [DPF] (Single Problem Approach):
 
     -   This model uses a deterministic process to predict the sales of a single product family at a single store. It uses a simple linear regression model to predict the sales of a single product family at a single store. To solve the multiple problems it uses a for loop to iterate over all the product families and stores. It is slower than the multiple problem approach but easier to understand and debug.
     -   Please find it in `optional_submission.py` file in `utils` directory in `solve_optional_customized_submission` function.
 
--   ML Forecasting Model (Single Problem Approach):
+-   ML Forecasting Model [ML] (Single Problem Approach):
 
     -   This model has multiple target values and uses Direct approach to predict the sales of a single product family at a single store. It uses a Hybrid model that combines a linear regression model with a XGBoost model to predict the sales of a single product family at a single store. To solve the multiple problems it uses a for loop to iterate over all the product families and stores. It is slower than the multiple problem approach but easier to understand and debug.
     -   Please find it in `ml_forecasting.py` file in `utils` directory in `solve_using_ml_forecasting` function.
 
--   Advanced ML Forecasting Model (Multiple Problem Approach):
+-   Advanced ML Forecasting Model [ML] (Multiple Problem Approach):
 
     -   This model has multiple target values and uses Direct approach to predict the sales of all stores and all families at once. Features are the most complex in comparison to the other models. The model is to use information from the following files:
         -   `train.csv`
