@@ -17,7 +17,7 @@
 			"name": "Python: Optimized Solution",
 			"type": "debugpy",
 			"request": "launch",
-			"program": "${workspaceFolder}/advanced.py",
+			"program": "${workspaceFolder}/advanced_ml_model.py",
 			"console": "integratedTerminal"
 		}
 	]

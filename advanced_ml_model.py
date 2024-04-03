@@ -1,11 +1,15 @@
 from typing import List, cast
+from matplotlib.axes import Axes
+from sklearn.discriminant_analysis import StandardScaler
 import pandas as pd
-from utils.helpers import load_files
-from utils.logger import logger
+from matplotlib import pyplot as plt
 from learntools.time_series.utils import (
     make_lags,
     make_leads,
 )
+import seaborn as sns
+from utils.helpers import load_files
+from utils.logger import logger
 
 # --- LOAD DATA ---
 logger.info("Loading data...")
@@ -74,6 +78,12 @@ combined_sales["dcoilwtico"] = (
     combined_sales["dcoilwtico"].bfill().ffill().astype("float32")
 )
 
+# --- NOTICE ---
+# A magnitude 7.8 earthquake struck Ecuador on April 16, 2016.
+# People rallied in relief efforts donating water and other first need products which greatly affected supermarket sales for several weeks after the earthquake.
+combined_sales["eartquake_impact"] = combined_sales.index.get_level_values("date").isin(
+    pd.date_range("2016-04-16", "2016-07-16")
+)
 lead_oil = make_leads(combined_sales["dcoilwtico"], leads=16, name="dcoilwtico").ffill()
 lead_holiday = make_leads(
     combined_sales["is_holiday"], leads=16, name="is_holiday"
@@ -87,7 +97,7 @@ lag_promotion = make_lags(
 ).bfill()
 lag_holiday = make_lags(combined_sales["is_holiday"], lags=2, name="is_holiday").bfill()
 
-combined_sales = (
+combined_sales_lead_lag = (
     combined_sales.join(lead_oil)
     .join(lead_holiday)
     .join(lead_promotion)
@@ -96,24 +106,93 @@ combined_sales = (
     .join(lag_holiday)
 )
 
-combined_sales_dummified = pd.get_dummies(combined_sales, drop_first=True)
 
-# TODO: Implement below
+# --- STANDARDIZE AND ENCODE DATA ---
+logger.info("Standardizing and encoding data...")
+col_to_scale = [
+    "dcoilwtico",
+    "sales",
+    "onpromotion",
+    "days_since_last_paycheck",
+    *lead_oil.columns,
+    *lag_target.columns,
+    *lag_promotion.columns,
+    *lead_promotion.columns,
+]
+col_to_encode = [
+    "month",
+    "day_of_week",
+    "is_holiday",
+    "eartquake_impact",
+    *lead_holiday.columns,
+    *lag_holiday.columns,
+]
 
-# --- STANDARDIZE DATA ---
-logger.warning("Standardizing data...")
+scaler = StandardScaler()
+scaler.fit(combined_sales_lead_lag[col_to_scale])
+col_scaled = pd.DataFrame(
+    scaler.transform(combined_sales_lead_lag[col_to_scale]),  # type: ignore
+    columns=col_to_scale,
+    index=combined_sales_lead_lag[col_to_scale].index,
+)
+col_encoded = pd.get_dummies(combined_sales_lead_lag[col_to_encode], drop_first=True)  # type: ignore
+
+combined_sales_final = pd.concat(
+    [col_scaled, col_encoded, combined_sales_lead_lag["id"]], axis=1
+)
 
 # --- CHECK FEATURES ---
-logger.warning("Checking features...")
+logger.info("Checking features...")
+
+DISABLE_CHECKING = True
+omit_col = [*combined_sales.select_dtypes("category").columns, "id"]
+num_col = list(set(list(combined_sales.columns)) - set(omit_col))
+
+if not DISABLE_CHECKING:
+
+    fig1 = plt.figure(figsize=(6, 4))
+    fig1.suptitle("Feature Correlation")
+
+    sns.heatmap(
+        combined_sales[num_col].corr(method="spearman"), vmin=-1, vmax=1, center=0, annot=True  # type: ignore
+    )
+
+    fig2, ax = plt.subplots(1, len(num_col), figsize=(10, 4))
+    fig2.suptitle("Feature Distribution")
+    ax = cast(Axes, ax)
+    for i in range(len(num_col)):
+        ax[i].hist(combined_sales[num_col[i]])  # type: ignore
+        ax[i].set_xlabel(num_col[i])  # type: ignore
+
+    plt.show()
+else:
+    logger.warning("Checking features disabled. Skipping...")
+    logger.warning("To enable, set DISABLE_CHECKING to False")
+
 
 # --- SPLIT DATA ---
-logger.warning("Splitting data...")
+logger.info("Splitting data...")
+
+TRAIN_START = "2013-01-01"
+TRAIN_END = "2016-12-31"
+TEST_START = "2017-01-01"
+TEST_END = "2017-07-31"
+
+X_train = combined_sales_final.loc[TRAIN_START:TRAIN_END].drop(columns=["sales", "id"])
+y_train = combined_sales_final.loc[TRAIN_START:TRAIN_END]["sales"]
+
+X_test = combined_sales_final.loc[TEST_START:TEST_END].drop(columns=["sales", "id"])
+y_test = combined_sales_final.loc[TEST_START:TEST_END]["sales"]
+
 
 # --- TRAIN MODEL ---
-logger.warning("Training model...")
+logger.error("Training model...")
 
 # --- EVALUATE MODEL ---
-logger.warning("Evaluating model...")
+logger.error("Evaluating model...")
+
+# --- OPTIMIZE MODEL WITH OPTUNA ---
+logger.error("Optimizing model with Optuna...")
 
 # --- PREDICT FUTURE ---
-logger.warning("Predicting future...")
+logger.error("Predicting future...")
