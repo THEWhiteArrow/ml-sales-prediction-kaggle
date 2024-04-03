@@ -11,6 +11,8 @@ import seaborn as sns
 from utils.helpers import load_files
 from utils.logger import logger
 
+logger.name = __name__
+
 # --- LOAD DATA ---
 logger.info("Loading data...")
 holidays_events, oil, stores, transactions, store_sales, query = load_files()
@@ -81,8 +83,11 @@ combined_sales["dcoilwtico"] = (
 # --- NOTICE ---
 # A magnitude 7.8 earthquake struck Ecuador on April 16, 2016.
 # People rallied in relief efforts donating water and other first need products which greatly affected supermarket sales for several weeks after the earthquake.
+# --- NOTICE ---
+# pd.perdiod_range must be used to create a range of dates because the dates are treated as period
+EARTH_QUAKE_IMPACT_PERIOD = 90
 combined_sales["eartquake_impact"] = combined_sales.index.get_level_values("date").isin(
-    pd.date_range("2016-04-16", "2016-07-16")
+    pd.period_range("2016-04-16", periods=EARTH_QUAKE_IMPACT_PERIOD)
 )
 lead_oil = make_leads(combined_sales["dcoilwtico"], leads=16, name="dcoilwtico").ffill()
 lead_holiday = make_leads(
@@ -178,21 +183,26 @@ TRAIN_END = "2016-12-31"
 TEST_START = "2017-01-01"
 TEST_END = "2017-07-31"
 
-X_train = combined_sales_final.loc[TRAIN_START:TRAIN_END].drop(columns=["sales", "id"])
-y_train = combined_sales_final.loc[TRAIN_START:TRAIN_END]["sales"]
+X_train = combined_sales_final.loc[TRAIN_START:TRAIN_END].drop(columns=["sales", "id"]).unstack(["family", "store_nbr"])  # type: ignore
+y_train = combined_sales_final.loc[TRAIN_START:TRAIN_END]["sales"].unstack(["family", "store_nbr"])  # type: ignore
 
-X_test = combined_sales_final.loc[TEST_START:TEST_END].drop(columns=["sales", "id"])
-y_test = combined_sales_final.loc[TEST_START:TEST_END]["sales"]
+X_test = combined_sales_final.loc[TEST_START:TEST_END].drop(columns=["sales", "id"]).unstack(["family", "store_nbr"])  # type: ignore
+y_test = combined_sales_final.loc[TEST_START:TEST_END]["sales"].unstack(["family", "store_nbr"])  # type: ignore
 
 
 # --- TRAIN MODEL ---
 logger.error("Training model...")
 
+# TODO: Label encoder for family and store_nbr
+
+# model = RegressorChain(XGBRegressor())
+# model.fit(X_train, y_train)
+
 # --- EVALUATE MODEL ---
 logger.error("Evaluating model...")
 
 # --- OPTIMIZE MODEL WITH OPTUNA ---
-logger.error("Optimizing model with Optuna...")
+logger.error("Optuna optymalization ...")
 
 # --- PREDICT FUTURE ---
 logger.error("Predicting future...")
