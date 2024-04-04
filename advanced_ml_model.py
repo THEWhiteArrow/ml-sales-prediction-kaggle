@@ -1,12 +1,13 @@
 from typing import List, cast
 from matplotlib.axes import Axes
 from sklearn.discriminant_analysis import StandardScaler
+from sklearn.metrics import mean_squared_error
+from sklearn.multioutput import RegressorChain
+from xgboost import XGBRegressor
+import optuna
 import pandas as pd
 from matplotlib import pyplot as plt
-from learntools.time_series.utils import (
-    make_lags,
-    make_leads,
-)
+from learntools.time_series.utils import make_lags, make_leads, make_multistep_target
 import seaborn as sns
 from utils.helpers import load_files
 from utils.logger import logger
@@ -40,6 +41,7 @@ combined_sales = cast(pd.DataFrame, combined_sales)
 logger.info("Feature engineering...")
 combined_sales["month"] = combined_sales.index.get_level_values("date").month  # type: ignore
 combined_sales["day_of_week"] = combined_sales.index.get_level_values("date").dayofweek  # type: ignore
+combined_sales["year"] = combined_sales.index.get_level_values("date").year  # type: ignore
 
 
 def get_days_since_last_paycheck(period: pd.Period) -> int:
@@ -74,6 +76,7 @@ combined_sales["is_holiday"] = combined_sales.index.get_level_values("date").isi
 combined_sales["is_holiday"] = combined_sales["is_holiday"].astype("category")
 combined_sales["month"] = combined_sales["month"].astype("category")
 combined_sales["day_of_week"] = combined_sales["day_of_week"].astype("category")
+combined_sales["year"] = combined_sales["year"].astype("category")
 
 combined_sales = combined_sales.join(oil)
 combined_sales["dcoilwtico"] = (
@@ -127,6 +130,7 @@ col_to_scale = [
 col_to_encode = [
     "month",
     "day_of_week",
+    "year",
     "is_holiday",
     "eartquake_impact",
     *lead_holiday.columns,
@@ -145,6 +149,7 @@ col_encoded = pd.get_dummies(combined_sales_lead_lag[col_to_encode], drop_first=
 combined_sales_final = pd.concat(
     [col_scaled, col_encoded, combined_sales_lead_lag["id"]], axis=1
 )
+
 
 # --- CHECK FEATURES ---
 logger.info("Checking features...")
@@ -183,26 +188,45 @@ TRAIN_END = "2016-12-31"
 TEST_START = "2017-01-01"
 TEST_END = "2017-07-31"
 
-X_train = combined_sales_final.loc[TRAIN_START:TRAIN_END].drop(columns=["sales", "id"]).unstack(["family", "store_nbr"])  # type: ignore
-y_train = combined_sales_final.loc[TRAIN_START:TRAIN_END]["sales"].unstack(["family", "store_nbr"])  # type: ignore
+X = combined_sales_final.drop(columns=["sales", "id"])
+y = make_multistep_target(combined_sales_final["sales"], steps=16)
 
-X_test = combined_sales_final.loc[TEST_START:TEST_END].drop(columns=["sales", "id"]).unstack(["family", "store_nbr"])  # type: ignore
-y_test = combined_sales_final.loc[TEST_START:TEST_END]["sales"].unstack(["family", "store_nbr"])  # type: ignore
+X_train, y_train = X.loc[TRAIN_START:TRAIN_END], y.loc[TRAIN_START:TRAIN_END]
+X_test, y_test = X.loc[TEST_START:TEST_END], y.loc[TEST_START:TEST_END]
 
-
-# --- TRAIN MODEL ---
+# --- TRAIN MODEL WITH OPTUNA ---
 logger.error("Training model...")
 
-# TODO: Label encoder for family and store_nbr
 
-# model = RegressorChain(XGBRegressor())
-# model.fit(X_train, y_train)
+def objective(trial):
+    params = {
+        "n_estimators": trial.suggest_int("n_estimators", 100, 1000, step=100),
+        "max_depth": trial.suggest_int("max_depth", 3, 10),
+        "learning_rate": trial.suggest_loguniform("learning_rate", 0.001, 0.1),
+        "subsample": trial.suggest_uniform("subsample", 0.6, 1.0),
+        "colsample_bytree": trial.suggest_uniform("colsample_bytree", 0.6, 1.0),
+        "gamma": trial.suggest_loguniform("gamma", 0.01, 10.0),
+        "reg_alpha": trial.suggest_loguniform("reg_alpha", 1e-8, 100.0),
+        "reg_lambda": trial.suggest_loguniform("reg_lambda", 1e-8, 100.0),
+        "min_child_weight": trial.suggest_loguniform("min_child_weight", 1e-8, 100.0),
+    }
 
-# --- EVALUATE MODEL ---
-logger.error("Evaluating model...")
+    model = RegressorChain(XGBRegressor(**params))
+    model.fit(X_train, y_train)
 
-# --- OPTIMIZE MODEL WITH OPTUNA ---
-logger.error("Optuna optymalization ...")
+    y_pred = model.predict(X_test)
+    rmse = mean_squared_error(y_test, y_pred, squared=False)
 
+    return rmse
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=100)  # type: ignore
+
+best_params = study.best_params
+print(f"Best hyperparameters: {best_params}")
+
+# final_model = RegressorChain(XGBRegressor(**best_params))
+# final_model.fit(X_train, y_train)
 # --- PREDICT FUTURE ---
 logger.error("Predicting future...")
