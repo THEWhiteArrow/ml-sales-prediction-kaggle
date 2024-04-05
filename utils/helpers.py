@@ -5,6 +5,8 @@ import pickle
 from functools import lru_cache
 from utils.logger import logger
 
+logger.name = __name__
+
 
 @lru_cache(maxsize=None)
 def load_files() -> Tuple[

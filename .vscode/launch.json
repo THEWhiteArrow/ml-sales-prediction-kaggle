@@ -19,6 +19,13 @@
 			"request": "launch",
 			"program": "${workspaceFolder}/advanced_ml_model.py",
 			"console": "integratedTerminal"
+		},
+		{
+			"name": "Here we go again",
+			"type": "debugpy",
+			"request": "launch",
+			"program": "${workspaceFolder}/mla.py",
+			"console": "internalConsole"
 		}
 	]
 }
