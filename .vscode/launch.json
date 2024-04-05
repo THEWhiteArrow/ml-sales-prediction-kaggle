@@ -6,22 +6,21 @@
 	"configurations": [
 		// launch the main.py file in the root directory
 		{
-			"name": "Python: Exploration File",
+			"name": "Debugpy: Exploration File",
 			"type": "debugpy",
 			"request": "launch",
 			"program": "${workspaceFolder}/exploration.py",
 			"console": "integratedTerminal"
 		},
-		// launch the optimized.py file in the root directory
 		{
-			"name": "Python: Optimized Solution",
+			"name": "Debugpy: Optimized Solution",
 			"type": "debugpy",
 			"request": "launch",
 			"program": "${workspaceFolder}/advanced_ml_model.py",
 			"console": "integratedTerminal"
 		},
 		{
-			"name": "Here we go again",
+			"name": "Debugpy: Here we go again",
 			"type": "debugpy",
 			"request": "launch",
 			"program": "${workspaceFolder}/mla.py",
