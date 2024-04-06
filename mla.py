@@ -183,35 +183,35 @@ X_test, y_test = (
 logger.info("Training model...")
 
 
-def objective(trial):
-    params = {
-        "n_estimators": trial.suggest_int("n_estimators", 100, 1000, step=100),
-        "max_depth": trial.suggest_int("max_depth", 3, 10),
-        "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.1, log=True),
-        "subsample": trial.suggest_float("subsample", 0.6, 1.0, log=True),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0, log=True),
-        "gamma": trial.suggest_float("gamma", 0.01, 10.0, log=True),
-        "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 100.0, log=True),
-        "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 100.0, log=True),
-        "min_child_weight": trial.suggest_float(
-            "min_child_weight", 1e-8, 100.0, log=True
-        ),
-    }
+# def objective(trial):
+#     params = {
+#         "n_estimators": trial.suggest_int("n_estimators", 100, 1000, step=100),
+#         "max_depth": trial.suggest_int("max_depth", 3, 10),
+#         "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.1, log=True),
+#         "subsample": trial.suggest_float("subsample", 0.6, 1.0, log=True),
+#         "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0, log=True),
+#         "gamma": trial.suggest_float("gamma", 0.01, 10.0, log=True),
+#         "reg_alpha": trial.suggest_float("reg_alpha", 1e-8, 100.0, log=True),
+#         "reg_lambda": trial.suggest_float("reg_lambda", 1e-8, 100.0, log=True),
+#         "min_child_weight": trial.suggest_float(
+#             "min_child_weight", 1e-8, 100.0, log=True
+#         ),
+#     }
 
-    model = RegressorChain(XGBRegressor(**params))
-    model.fit(X_train, y_train)
+#     model = RegressorChain(XGBRegressor(**params))
+#     model.fit(X_train, y_train)
 
-    y_pred = model.predict(X_test)
-    rmse = mean_squared_error(y_test, y_pred)
+#     y_pred = model.predict(X_test)
+#     rmse = mean_squared_error(y_test, y_pred)
 
-    return rmse
+#     return rmse
 
 
-study = optuna.create_study(direction="minimize", study_name="RegressorChain")
-study.optimize(objective, n_trials=50)  # type: ignore
+# study = optuna.create_study(direction="minimize", study_name="RegressorChain")
+# study.optimize(objective, n_trials=50)  # type: ignore
 
-best_params = study.best_params
-logger.info(f"Best hyperparameters: {best_params}")
+# best_params = study.best_params
+# logger.info(f"Best hyperparameters: {best_params}")
 
 
 # --- PREDICTION ---
@@ -220,13 +220,17 @@ X_data = X.loc[:, :, "2013-02":"2017-07-31"]  # type: ignore
 y_data = y.loc[:, :, "2013-02":"2017-07-31"]  # type: ignore
 X_query = X.loc[:, :, "2017-08-01":"2017-08-15"]  # type: ignore
 
-
-model = RegressorChain(XGBRegressor(**best_params))
-model.fit(X_data, y_data)
-
-pred_df = pd.DataFrame(
-    model.predict(X_query), index=X_query.index, columns=y_data.columns
-)
+legacy_best_params = {
+    "n_estimators": 900,
+    "max_depth": 12,
+    "learning_rate": 0.011343587710019755,
+    "subsample": 0.645877958161604,
+    "colsample_bytree": 0.6786355037270021,
+    "gamma": 0.06258912795337752,
+    "reg_alpha": 0.4514809312811976,
+    "reg_lambda": 1.2158028885073078e-05,
+    "min_child_weight": 4.962702002200526,
+}
 
 
 def make_output(
@@ -261,9 +265,35 @@ def make_output(
     return output_df
 
 
-submission = make_output(pred_df)
-submission = query.set_index(main_index).join(submission)[["id", "sales"]]
-submission.to_csv("submission.csv", index=False)
+total = pd.DataFrame()
+
+for store in unique_stores:
+    for family in unique_families:
+        X_data_single = X_data.loc[(store, family), :]
+        y_data_single = y_data.loc[(store, family), :]
+        X_query_single = X_query.loc[(store, family), :]
+        model = RegressorChain(XGBRegressor(**legacy_best_params))
+        model.fit(X_data_single, y_data_single)
+        pred = model.predict(X_query_single)
+        pred_df = pd.DataFrame(
+            model.predict(X_query), index=X_query.index, columns=y_data.columns
+        )
+        total = pd.concat([total, make_output(pred_df)])
+
+total_final = query.set_index(main_index).join(total)[["id", "sales"]]
+total_final.to_csv("total.csv", index=False)
+
+# model = RegressorChain(XGBRegressor(**legacy_best_params))
+# model.fit(X_data, y_data)
+
+# pred_df = pd.DataFrame(
+#     model.predict(X_query), index=X_query.index, columns=y_data.columns
+# )
+
+
+# submission = make_output(pred_df)
+# submission = query.set_index(main_index).join(submission)[["id", "sales"]]
+# submission.to_csv("submission.csv", index=False)
 
 logger.info("Submission file created.")
 logger.info("Done.")
